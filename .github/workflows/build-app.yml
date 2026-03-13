@@ -12,7 +12,7 @@ on:
       flavor_selection:
         description: '选择构建口味 (例如: SlionsFullPlaystore 或 StyxBaseDownload)'
         required: true
-        default: 'SlionsFullPlaystore'
+        default: 'SlionsFullPlaystore.alpha'
       release_type:
         description: '是否发布到 GitHub Releases?'
         required: true
