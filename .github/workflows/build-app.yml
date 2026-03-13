@@ -1,0 +1,108 @@
+name: Build Custom Fulguris
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_abi:
+        description: '选择构建架构'
+        required: true
+        type: choice
+        options: [all, arm64-v8a, armeabi-v7a]
+        default: 'arm64-v8a'
+      flavor_selection:
+        description: '选择构建口味 (例如: SlionsFullPlaystore 或 StyxBaseDownload)'
+        required: true
+        default: 'SlionsFullPlaystore'
+      release_type:
+        description: '是否发布到 GitHub Releases?'
+        required: true
+        type: choice
+        options: [none, pre-release, release]
+        default: 'none'
+#  push:
+#    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    name: Build Signed Release APK
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      - name: 2. Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { java-version: '17', distribution: 'temurin', cache: gradle }
+
+      - name: 3. Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: 4. Inject Keystore File
+        env: { KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }} }
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+
+      - name: 5. Dynamic modify build.gradle (The Magic Step)
+        run: |
+          # A. 动态注入签名配置
+          sed -i 's|//signingConfig debug.signingConfig|signingConfig signingConfigs.release|g' app/build.gradle
+          sed -i '/signingConfigs {/a \    create("release") { storeFile = file("release.keystore"); storePassword = System.getenv("KEYSTORE_PASSWORD"); keyAlias = System.getenv("KEY_ALIAS"); keyPassword = System.getenv("KEY_PASSWORD") }' app/build.gradle
+          
+          # B. 动态架构控制
+          ABI="${{ github.event.inputs.target_abi }}"
+          if [ "$ABI" != "all" ]; then
+            echo "🔥 正在配置架构过滤: $ABI"
+            sed -i "s|//abiFilters .*|abiFilters \"$ABI\"|g" app/build.gradle
+            sed -i "s|//abiFilters|abiFilters|g" app/build.gradle
+          fi
+
+      - name: 6. Verify modified build.gradle
+        run: |
+          echo "================================================="
+          echo "      修改后的 build.gradle 核心配置核对           "
+          echo "================================================="
+          grep -A 8 "signingConfigs" app/build.gradle || true
+          grep -A 3 "ndk" app/build.gradle || true
+          echo "================================================="
+
+      - name: 7. Build and Auto-Sign Release APKs
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # 严格使用动态组合的 task 名，确保精准构建特定 flavor
+        run: ./gradlew assemble${{ github.event.inputs.flavor_selection }}Release
+
+      - name: 8. Upload arm64-v8a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fulguris-arm64-v8a
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: ignore
+
+      - name: 9. Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fulguris-armeabi-v7a
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: ignore
+
+      - name: 10. Create GitHub Release
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_type != 'none' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "custom-build-${{ github.run_number }}"
+          prerelease: ${{ github.event.inputs.release_type == 'pre-release' }}
+          files: app/build/outputs/apk/**/*.apk
+
+      - name: 11. Security Cleanup
+        if: always()
+        run: |
+          echo "🧹 开始主动清洗构建环境..."
+          if [ -f "app/release.keystore" ]; then
+            shred -u app/release.keystore || rm -f app/release.keystore
+          fi
+          git checkout app/build.gradle 2>/dev/null || true
+          echo "✅ 构建脚本已恢复。"
