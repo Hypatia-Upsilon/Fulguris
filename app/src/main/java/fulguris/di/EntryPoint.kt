@@ -12,6 +12,9 @@ import fulguris.download.DownloadHandler
 import fulguris.favicon.FaviconModel
 import fulguris.html.homepage.HomePageFactory
 import fulguris.js.InvertPage
+import fulguris.js.NestedScrollDetect
+import fulguris.js.BlobDownload
+import fulguris.js.BlobHook
 import fulguris.js.SetMetaViewport
 import fulguris.js.TextReflow
 import fulguris.js.ThemeColor
@@ -58,6 +61,9 @@ interface HiltEntryPoint {
     val invertPageJs: InvertPage
     val setMetaViewport: SetMetaViewport
     val themeColorJs: ThemeColor
+    val nestedScrollDetectJs: NestedScrollDetect
+    val blobDownloadJs: BlobDownload
+    val blobHookJs: BlobHook
     val homePageFactory: HomePageFactory
     val abpBlockerManager: AbpBlockerManager
     val noopBlocker: NoOpAdBlocker
@@ -75,5 +81,3 @@ interface HiltEntryPoint {
     var clipboardManager: ClipboardManager
 
 }
-
-

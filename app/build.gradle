@@ -324,7 +324,7 @@ dependencies {
     implementation project(path: ":AppIntro")
 
     // Play Store billing
-    playstoreImplementation 'com.android.billingclient:billing:6.2.0'
+    playstoreImplementation 'com.android.billingclient:billing:7.1.1'
 
     // html parsing for reading mode
     implementation 'org.jsoup:jsoup:1.13.1'
@@ -483,7 +483,10 @@ mezzanine {
             "src/main/html/private.html",
             "src/main/js/InvertPage.js",
             "src/main/js/SetMetaViewport.js",
-            "src/main/js/ThemeColor.js"
+            "src/main/js/ThemeColor.js",
+            "src/main/js/NestedScrollDetect.js",
+            "src/main/js/BlobDownload.js",
+            "src/main/js/BlobHook.js"
     )
 }
 
